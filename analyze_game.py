@@ -1,3 +1,4 @@
+import argparse
 import requests
 from bs4 import BeautifulSoup
 import re
@@ -140,18 +141,34 @@ def embellish_pgn(pgn):
         lines[moves_line_index] = " ".join(new_moves)
         updated_pgn.append("\n".join(lines))
 
-    return "\n\n".join(updated_pgn)
-
-
-# print(get_lichess_game_errors("https://lichess.org/PpwPOZMq"))
+    return "\n\n[Event ".join(updated_pgn)
 
 
 def main():
-    with open( "../dataset/short_lichess.pgn", "r") as input_pgn_file:
+    # Set up argument parser
+    parser = argparse.ArgumentParser(
+        description='Utility that reads a pgn file,\
+            and embellishes the chess moves with error info:\
+            1. Inaccuracy\
+            2. Blunder\
+            3. Mistake'
+    )
+    parser.add_argument('input_file', help='Path to the input PGN file')
+    parser.add_argument('output_file', help='Path to save the embellished PGN file')
+    
+    # Parse the arguments
+    args = parser.parse_args()
+    print(f"Reading from: {args.input_file}")
+    # with open( "../dataset/short_lichess.pgn", "r") as input_pgn_file:
+    with open(args.input_file, "r") as input_pgn_file:
         input_pgn = input_pgn_file.read()
         embellished_pgn = embellish_pgn(input_pgn)
-        with open( "../dataset/short_lichess_embellished.pgn", "w") as output_pgn_file:
+        # with open( "../dataset/short_lichess_embellished.pgn", "w") as output_pgn_file:
+        print(f"Writing the embellished file to : {args.output_file}")
+        with open(args.output_file, "w") as output_pgn_file:
             output_pgn_file.write(embellished_pgn)
 
 if __name__ == "__main__":
     main()
+
+#  python3 analyze_game.py ../dataset/short_lichess.pgn ../dataset/short_lichess_embellished.pgn
