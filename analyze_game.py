@@ -1,7 +1,32 @@
 import argparse
 import requests
 from bs4 import BeautifulSoup
+import logging
 import re
+
+def setup_logger(log_level=logging.INFO):
+    """
+    Set up and configure a logger for console output
+    
+    Args:
+        log_level: The logging level (default: logging.INFO)
+    
+    Returns:
+        A configured logger instance
+    """
+    # Create logger
+    logger = logging.getLogger('chess_pgn_analyzer')
+    logger.setLevel(log_level)
+    
+    # Create formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+    
+    return logger
 
 def get_lichess_game_errors(url):
     """
@@ -14,7 +39,7 @@ def get_lichess_game_errors(url):
         dict: Dictionary with move numbers as keys and error details as values
     """
     # Make HTTP GET request to the URL
-    print(f"Making a HTTP call to {url}")
+    logger.info(f"Making a HTTP call to {url}")
     response = requests.get(url)
     
     if response.status_code != 200:
@@ -42,7 +67,6 @@ def get_lichess_game_errors(url):
     
     # Find white's errors
     white_matches = re.findall(white_pattern, pgn_text)
-    # print(white_matches)
     for move_number, move, symbol, error_type in white_matches:
         if move_number not in errors_by_move.keys():
             errors_by_move[move_number] = {}
@@ -66,7 +90,7 @@ def get_lichess_game_errors(url):
             "symbol": symbol
         }
     
-    print(errors_by_move)
+    logger.info(f"Errors by move: {errors_by_move}")
     return errors_by_move
 
 def embellish_pgn(pgn):
@@ -79,15 +103,15 @@ def embellish_pgn(pgn):
     Returns:
         str: Updated PGN with annotations
     """
-    print("in embellish pgn")
+    logger.info("In embellish pgn")
     games = pgn.strip().split("\n\n[Event")  # Split PGN into individual games
     updated_pgn = []
 
     for game in games:
-        print("----------------------------")
-        print(f"Game: {games.index(game)}")
+        logger.info("----------------------------")
+        logger.info(f"Game: {games.index(game)}")
         lines = game.strip().split("\n")
-        print(f"Total number of lines: {len(lines)}")
+        logger.info(f"Total number of lines of pgn to parse in this game: {len(lines)}")
         url = None
         moves_line_index = None
 
@@ -99,18 +123,18 @@ def embellish_pgn(pgn):
                     url = match.group(1)
             # if not line.startswith("[") and moves_line_index is None:
             if line.startswith("1."):
-                print(f"Line of interest: {line}")
+                logger.info(f"Line of interest: {line}")
                 moves_line_index = i
         
-        print(url)
+
         if not url or moves_line_index is None:
-            print("Warning: No URL found")
+            logger.warning("Warning: No URL found")
             updated_pgn.append(game)  # Skip if no URL found
             continue
 
         errors = get_lichess_game_errors(url)
         moves = lines[moves_line_index].split(" ")
-        print(f"Moves: {moves}")
+        logger.debug(f"Moves: {moves}")
 
         # Annotate the moves with errors
         new_moves = []
@@ -145,6 +169,7 @@ def embellish_pgn(pgn):
 
 
 def main():
+    global logger
     # Set up argument parser
     parser = argparse.ArgumentParser(
         description='Utility that reads a pgn file,\
@@ -155,16 +180,23 @@ def main():
     )
     parser.add_argument('input_file', help='Path to the input PGN file')
     parser.add_argument('output_file', help='Path to save the embellished PGN file')
+    parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+                        default='INFO', help='Set the logging level')
     
     # Parse the arguments
     args = parser.parse_args()
-    print(f"Reading from: {args.input_file}")
+
+    # Set up logging
+    log_level = getattr(logging, args.log_level)
+    logger = setup_logger(log_level)
+
+    logger.info(f"Reading from: {args.input_file}")
     # with open( "../dataset/short_lichess.pgn", "r") as input_pgn_file:
     with open(args.input_file, "r") as input_pgn_file:
         input_pgn = input_pgn_file.read()
         embellished_pgn = embellish_pgn(input_pgn)
         # with open( "../dataset/short_lichess_embellished.pgn", "w") as output_pgn_file:
-        print(f"Writing the embellished file to : {args.output_file}")
+        logger.info(f"Writing the embellished file to : {args.output_file}")
         with open(args.output_file, "w") as output_pgn_file:
             output_pgn_file.write(embellished_pgn)
 
