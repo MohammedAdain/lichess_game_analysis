@@ -41,6 +41,7 @@ def get_lichess_game_errors(url):
     
     # Find white's errors
     white_matches = re.findall(white_pattern, pgn_text)
+    # print(white_matches)
     for move_number, move, symbol, error_type in white_matches:
         if move_number not in errors_by_move.keys():
             errors_by_move[move_number] = {}
@@ -64,6 +65,93 @@ def get_lichess_game_errors(url):
             "symbol": symbol
         }
     
+    print(errors_by_move)
     return errors_by_move
 
-print(get_lichess_game_errors("https://lichess.org/PpwPOZMq"))
+def embellish_pgn(pgn):
+    """
+    Annotates a PGN file with error types from Lichess.
+
+    Args:
+        pgn (str): Raw PGN content
+
+    Returns:
+        str: Updated PGN with annotations
+    """
+    print("in embellish pgn")
+    games = pgn.strip().split("\n\n[Event")  # Split PGN into individual games
+    updated_pgn = []
+
+    for game in games:
+        print("----------------------------")
+        print(f"Game: {games.index(game)}")
+        lines = game.strip().split("\n")
+        print(f"Total number of lines: {len(lines)}")
+        url = None
+        moves_line_index = None
+
+        # Extract the game URL
+        for i, line in enumerate(lines):
+            if line.startswith("[Site"):
+                match = re.search(r'"(https://lichess\.org/\w+)"', line)
+                if match:
+                    url = match.group(1)
+            # if not line.startswith("[") and moves_line_index is None:
+            if line.startswith("1."):
+                print(f"Line of interest: {line}")
+                moves_line_index = i
+        
+        print(url)
+        if not url or moves_line_index is None:
+            print("Warning: No URL found")
+            updated_pgn.append(game)  # Skip if no URL found
+            continue
+
+        errors = get_lichess_game_errors(url)
+        moves = lines[moves_line_index].split(" ")
+        print(f"Moves: {moves}")
+
+        # Annotate the moves with errors
+        new_moves = []
+        move_number = 1
+        is_black_move = False
+
+        for move in moves:
+            if re.match(r"^\d+\.$", move):  # Detect move numbers (e.g., "1.")
+                move_number = int(move[:-1])  # Remove "."
+                new_moves.append(move)
+                is_black_move = False
+                continue
+
+            if move in ["1-0", "0-1", "1/2-1/2"]:  # Detect result
+                new_moves.append(move)
+                break
+
+            error_info = errors.get(str(move_number), {}).get("black" if is_black_move else "white")
+
+            # if error_info and move == error_info["move"]:
+            if error_info:
+                move = f"{move} {{{error_info['error_type']}}}"
+
+            new_moves.append(move)
+            is_black_move = not is_black_move  # Switch turns
+
+        # Replace original moves line
+        lines[moves_line_index] = " ".join(new_moves)
+        updated_pgn.append("\n".join(lines))
+
+    return "\n\n".join(updated_pgn)
+
+
+# print(get_lichess_game_errors("https://lichess.org/PpwPOZMq"))
+
+
+def main():
+    with open( "../dataset/short_lichess.pgn", "r") as input_pgn_file:
+        input_pgn = input_pgn_file.read()
+        embellished_pgn = embellish_pgn(input_pgn)
+        with open( "../dataset/short_lichess_embellished.pgn", "w") as output_pgn_file:
+            output_pgn_file.write(embellished_pgn)
+
+if __name__ == "__main__":
+    main()
