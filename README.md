@@ -63,6 +63,11 @@ python analyze_game.py input_file.pgn output_file.pgn [--log-level LEVEL]
 python analyze_game.py ../dataset/my_games.pgn ../dataset/my_games_annotated.pgn --log-level INFO
 ```
 
+Note: To uncompress a pgn.zst file, use the zstd tool
+```
+zstd -d <PATH_TO_ZST_COMPRESSED_PGN_FILE>.pgn.zst 
+```
+
 ## How It Works
 
 1. The script parses the input PGN file and extracts Lichess game URLs
